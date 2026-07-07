@@ -7,8 +7,8 @@ pool:
 variables:
   buildConfiguration: 'Release'
   # Ajustado para os nomes exatos das suas pastas
-  angularProjectDir: '$(System.DefaultWorkingDirectory)/frontend'
-  netProjectDir: '$(System.DefaultWorkingDirectory)/backend'
+  angularProjectDir: '$(System.DefaultWorkingDirectory)/Frontend'
+  netProjectDir: '$(System.DefaultWorkingDirectory)/Backend'
   dotnetVersion: '10.0.x'
 
 stages:
