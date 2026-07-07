@@ -40,36 +40,39 @@ steps:
   displayName: 'Frontend: Compilar o projeto Angular'
 
 # ================= PIPELINE DO BACKEND (.NET 10) =================
-- script: |
-    NET_PATH=$(find "$(Build.SourcesDirectory)/Backend" -name "*.sln" -o -name "*.csproj" -exec dirname {} \; | head -n 1)
-    if [ -z "$NET_PATH" ]; then NET_PATH="$(Build.SourcesDirectory)/Backend"; fi
-    echo "Diretório .NET detectado: $NET_PATH"
-    echo "##vso[task.setvariable variable=detectedNetDir]$NET_PATH"
-  displayName: 'Backend: Detectar pasta do projeto'
+- task: DotNetCoreCLI@2
+  displayName: 'Backend: Restaurar dependências'
+  inputs:
+    command: 'restore'
+    projects: 'Backend/exemploAPIVendas.slnx'
 
-- script: dotnet restore
-  workingDirectory: $(detectedNetDir)
-  displayName: 'Backend: Restaurar pacotes Nuget'
+- task: DotNetCoreCLI@2
+  displayName: 'Backend: Compilar API'
+  inputs:
+    command: 'build'
+    projects: 'Backend/exemploAPIVendas.slnx'
+    arguments: '--configuration $(buildConfiguration) --no-restore'
 
-- script: dotnet build --configuration $(buildConfiguration) --no-restore
-  workingDirectory: $(detectedNetDir)
-  displayName: 'Backend: Compilar o projeto .NET'
-
-- script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx
-  workingDirectory: $(detectedNetDir)
+- task: DotNetCoreCLI@2
   displayName: 'Backend: Executar testes'
+  inputs:
+    command: 'test'
+    projects: 'Backend/exemploAPIVendas.slnx'
+    arguments: '--configuration $(buildConfiguration) --no-build'
   condition: always()
 
-# CORREÇÃO BACKEND: Removido o --no-build para garantir que TODOS os arquivos associados, configs e assets sejam gerados no output
-- script: dotnet publish --configuration $(buildConfiguration) --output "$(Build.ArtifactStagingDirectory)/ApiPublish"
-  workingDirectory: $(detectedNetDir)
+- task: DotNetCoreCLI@2
   displayName: 'Backend: Publicar para Deploy'
+  inputs:
+    command: 'publish'
+    publishWebProjects: false
+    projects: 'Backend/exemploAPIVendas.slnx'
+    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/ApiPublish --no-restore'
+    zipAfterPublish: false
 
 # ================= SALVAR ARTEFATOS PARA DEPLOY =================
-# CORREÇÃO FRONTEND: Garantimos que o artefato seja a pasta raiz 'dist/NomeDoProjeto' inteira, e não apenas onde o index.html reside isoladamente
 - script: |
     DIST_ROOT="$(Build.SourcesDirectory)/Frontend/dist"
-    # Procura a primeira subpasta real dentro de dist que contenha arquivos compilados
     PROJECT_DIST=$(find "$DIST_ROOT" -mindepth 1 -maxdepth 2 -type d | head -n 1)
     if [ -z "$PROJECT_DIST" ]; then PROJECT_DIST="$DIST_ROOT"; fi
     echo "Diretório Completo de Dist do Angular detectado: $PROJECT_DIST"
@@ -94,7 +97,7 @@ steps:
 - script: |
     echo "Sinalizando o Render para puxar as atualizações..."
     curl -X POST "$(RENDER_FRONTEND_HOOK)"
-    echo -e "\nFrontend atualizado."
+    echo -e "\nFrontend updated."
     curl -X POST "$(RENDER_BACKEND_HOOK)"
     echo -e "\nBackend updated."
   displayName: 'Render: Disparar Auto-Deploy Webhook'
