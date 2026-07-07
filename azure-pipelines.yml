@@ -61,13 +61,14 @@ steps:
     arguments: '--configuration $(buildConfiguration) --no-build'
   condition: always()
 
+# CORREÇÃO BACKEND: Adicionado o runtime do Windows (win-x64) para forçar a criação do arquivo .exe
 - task: DotNetCoreCLI@2
   displayName: 'Backend: Publicar para Deploy'
   inputs:
     command: 'publish'
     publishWebProjects: false
     projects: 'Backend/exemploAPIVendas.slnx'
-    arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/ApiPublish --no-restore'
+    arguments: '--configuration $(buildConfiguration) -r win-x64 --self-contained false --output $(Build.ArtifactStagingDirectory)/ApiPublish --no-restore'
     zipAfterPublish: false
 
 # ================= SALVAR ARTEFATOS PARA DEPLOY =================
@@ -92,13 +93,3 @@ steps:
     ArtifactName: 'backend-drop'
     publishLocation: 'Container'
   displayName: 'Publicar Artefato: Backend'
-
-# ================= AUTO DEPLOY NO RENDER VIA WEBHOOK =================
-- script: |
-    echo "Sinalizando o Render para puxar as atualizações..."
-    curl -X POST "$(RENDER_FRONTEND_HOOK)"
-    echo -e "\nFrontend updated."
-    curl -X POST "$(RENDER_BACKEND_HOOK)"
-    echo -e "\nBackend updated."
-  displayName: 'Render: Disparar Auto-Deploy Webhook'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
