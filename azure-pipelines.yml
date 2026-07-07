@@ -40,45 +40,42 @@ steps:
   workingDirectory: '$(Build.SourcesDirectory)/Frontend'
   displayName: 'Frontend: Compilar o projeto Angular'
 
-# Se você tiver testes unitários no Angular, remova o '#' da linha abaixo
-# - script: npm test -- --watch=false --browsers=ChromeHeadless
-#   workingDirectory: '$(Build.SourcesDirectory)/Frontend'
-#   displayName: 'Frontend: Executar testes'
-
 # ================= PIPELINE DO BACKEND (.NET 10) =================
 - script: |
-    # Busca a pasta que contém o arquivo de solução ou projeto principal
-    NET_PATH=$(find . -name "*.sln" -o -name "*.csproj" -exec dirname {} \; | head -n 1)
+    # Busca o caminho absoluto da pasta que contém .sln ou .csproj
+    NET_PATH=$(find "$(Build.SourcesDirectory)/Backend" -name "*.sln" -o -name "*.csproj" -exec dirname {} \; | head -n 1)
+    echo "Diretório .NET detectado: $NET_PATH"
     echo "##vso[task.setvariable variable=detectedNetDir]$NET_PATH"
-    
-    cd "$NET_PATH"
-    dotnet restore
-  workingDirectory: '$(Build.SourcesDirectory)/Backend'
+  displayName: 'Backend: Detectar pasta do projeto'
+
+- script: dotnet restore
+  workingDirectory: '$(detectedNetDir)'
   displayName: 'Backend: Restaurar pacotes Nuget'
 
 - script: dotnet build --configuration $(buildConfiguration) --no-restore
-  workingDirectory: '$(Build.SourcesDirectory)/$(detectedNetDir)'
+  workingDirectory: '$(detectedNetDir)'
   displayName: 'Backend: Compilar o projeto .NET'
 
 - script: dotnet test --configuration $(buildConfiguration) --no-build --logger trx
-  workingDirectory: '$(Build.SourcesDirectory)/$(detectedNetDir)'
+  workingDirectory: '$(detectedNetDir)'
   displayName: 'Backend: Executar testes'
   condition: always()
 
 - script: dotnet publish --configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/ApiPublish --no-build
-  workingDirectory: '$(Build.SourcesDirectory)/$(detectedNetDir)'
+  workingDirectory: '$(detectedNetDir)'
   displayName: 'Backend: Publicar para Deploy'
 
 # ================= SALVAR ARTEFATOS PARA DEPLOY =================
 - script: |
-    # Mapeia dinamicamente onde o Angular 17 gerou o index.html (evita erro de pasta inexistente)
-    DIST_TARGET=$(find Frontend/dist -name "index.html" -exec dirname {} \; | head -n 1)
+    # Mapeia de forma absoluta onde o Angular 17 gerou o index.html
+    DIST_TARGET=$(find "$(Build.SourcesDirectory)/Frontend/dist" -name "index.html" -exec dirname {} \; | head -n 1)
+    echo "Diretório Angular Dist detectado: $DIST_TARGET"
     echo "##vso[task.setvariable variable=detectedAngularDist]$DIST_TARGET"
   displayName: 'Mapear Saída do Angular'
 
 - task: PublishBuildArtifacts@1
   inputs:
-    PathtoPublish: '$(Build.SourcesDirectory)/$(detectedAngularDist)'
+    PathtoPublish: '$(detectedAngularDist)'
     ArtifactName: 'frontend-drop'
     publishLocation: 'Container'
   displayName: 'Publicar Artefato: Frontend'
@@ -93,15 +90,9 @@ steps:
 # ================= AUTO DEPLOY NO RENDER VIA WEBHOOK =================
 - script: |
     echo "Sinalizando o Render para puxar as atualizações..."
-    
-    # IMPORTANTE: Crie essas variáveis secretas no painel do seu pipeline no Azure DevOps
-    # ou substitua diretamente pelas suas URLs do Render (Settings > Deploy Hook)
-    
     curl -X POST "$(RENDER_FRONTEND_HOOK)"
     echo -e "\nFrontend atualizado."
-    
     curl -X POST "$(RENDER_BACKEND_HOOK)"
     echo -e "\nBackend atualizado."
   displayName: 'Render: Disparar Auto-Deploy Webhook'
-  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main')) 
-  # O deploy só acontece se o build passar E se for na branch principal (main/master)
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
