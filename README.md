@@ -11,7 +11,7 @@ Exemplo de projeto CQRS-like de Vendas com Serilog e idempotência em C# ASP.NET
 #### ⚠️ String de conexão do banco 
 Modifique a string de conexão no arquivo **appsettings.json**, no trecho indicado:
 ```bash
- "DefaultConnection": "Host=localhost;Port=5432;Database=vendas_db;Username=postgres;Password=[SUA_SENHA]"
+ "DefaultConnection": "Host=localhost;Port=5432;Database=vendas-db;Username=postgres;Password=[SUA_SENHA]"
 ```
 
 ## 📁 Backend
